@@ -1,0 +1,16 @@
+services:
+  web:
+    build: .
+    image: shard-planner:latest
+    ports:
+      - "8000:8000"
+    environment:
+      PLANNER_DB: /data/plans.db
+      # 生产环境请覆盖 SECRET_KEY
+      # SECRET_KEY: change-me
+    volumes:
+      - planner_data:/data
+    restart: unless-stopped
+
+volumes:
+  planner_data:

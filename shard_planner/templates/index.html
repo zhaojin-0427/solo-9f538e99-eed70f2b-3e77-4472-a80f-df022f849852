@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>新建分片计划</h2>
+  {% if error %}
+    <div class="flash flash-error" role="alert">{{ error }}</div>
+  {% endif %}
+  <form method="post" action="{{ url_for('planner.create_plan') }}" enctype="multipart/form-data">
+    <label for="manifest_text">分区清单（JSON，每行一个分区；最多 {{ max_entities }} 个实体）</label>
+    <textarea id="manifest_text" name="manifest_text" rows="10" spellcheck="false"
+      placeholder='[{"partition_key": "dt=2026-01-01/hour=00", "entity": "orders", "bytes": 734003200, "records": 1200000}]'>{{ form.manifest_text }}</textarea>
+
+    <label for="manifest_file">或上传清单文件（.json / .csv，CSV 表头：partition_key,entity,bytes,records）</label>
+    <input type="file" id="manifest_file" name="manifest_file" accept=".json,.csv,text/plain,text/csv,application/json">
+
+    <div class="field-row">
+      <div>
+        <label for="worker_count">worker 数</label>
+        <input type="number" id="worker_count" name="worker_count" min="1" max="512" required
+               value="{{ form.worker_count }}" placeholder="例如 4">
+      </div>
+      <div>
+        <label for="worker_byte_limit">每个 worker 的字节上限</label>
+        <input type="number" id="worker_byte_limit" name="worker_byte_limit" min="1" required
+               value="{{ form.worker_byte_limit }}" placeholder="例如 1073741824">
+      </div>
+    </div>
+
+    <button type="submit">生成并发布计划</button>
+  </form>
+  <details class="example">
+    <summary>查看示例清单</summary>
+    <pre>[
+  {"partition_key": "dt=2026-01-01/hour=00", "entity": "orders",  "bytes": 734003200, "records": 1200000},
+  {"partition_key": "dt=2026-01-01/hour=01", "entity": "orders",  "bytes": 402653184, "records": 640000},
+  {"partition_key": "dt=2026-01-01",         "entity": "users",   "bytes": 268435456, "records": 300000},
+  {"partition_key": "dt=2026-01-01",         "entity": "events",  "bytes": 536870912, "records": 5200000}
+]</pre>
+    <p>约束：同一实体的所有分区会放进同一分片；每个分片总字节不超过单 worker 上限；存在可行分配才会发布。</p>
+  </details>
+</section>
+
+<section class="card">
+  <h2>已发布计划（{{ plans|length }}）</h2>
+  {% if plans %}
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th><th>创建时间 (UTC)</th><th>worker 数</th><th>单 worker 上限</th>
+        <th>实体数</th><th>分区数</th><th>总字节</th><th>总记录数</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in plans %}
+      <tr>
+        <td>#{{ p.id }}</td>
+        <td>{{ p.created_at }}</td>
+        <td>{{ p.worker_count }}</td>
+        <td>{{ p.worker_byte_limit|human_bytes }}</td>
+        <td>{{ p.entity_count }}</td>
+        <td>{{ p.partition_count }}</td>
+        <td>{{ p.total_bytes|human_bytes }}</td>
+        <td>{{ p.total_records }}</td>
+        <td><a href="{{ url_for('planner.view_plan', plan_id=p.id) }}">查看</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">还没有已发布的计划。</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}计划 #{{ plan.id }} · 数据湖分片规划{% endblock %}
+{% block content %}
+<section class="card">
+  <h2>计划 #{{ plan.id }}</h2>
+  <dl class="meta">
+    <div><dt>创建时间 (UTC)</dt><dd>{{ plan.created_at }}</dd></div>
+    <div><dt>worker 数</dt><dd>{{ plan.worker_count }}</dd></div>
+    <div><dt>单 worker 上限</dt><dd>{{ plan.worker_byte_limit|human_bytes }}（{{ plan.worker_byte_limit }} 字节）</dd></div>
+    <div><dt>实体数</dt><dd>{{ plan.entity_count }}</dd></div>
+    <div><dt>分区数</dt><dd>{{ plan.partition_count }}</dd></div>
+    <div><dt>总字节</dt><dd>{{ plan.total_bytes|human_bytes }}（{{ plan.total_bytes }} 字节）</dd></div>
+    <div><dt>总记录数</dt><dd>{{ plan.total_records }}</dd></div>
+  </dl>
+  <p><a class="button" href="{{ url_for('planner.export_plan', plan_id=plan.id) }}">导出 JSON（交给并行作业）</a></p>
+</section>
+
+{% for shard in shards %}
+<section class="card shard">
+  <h3>
+    分片 {{ shard.row.shard_index }}
+    <span class="shard-total">
+      {{ shard.row.total_bytes|human_bytes }} / {{ plan.worker_byte_limit|human_bytes }}
+      （{{ shard.row.total_bytes|pct(plan.worker_byte_limit) }}），{{ shard.row.total_records }} 条记录
+    </span>
+  </h3>
+  <div class="bar">
+    <div class="bar-fill" style="width: {{ (100 * shard.row.total_bytes / plan.worker_byte_limit) | round(2) if plan.worker_byte_limit else 0 }}%"></div>
+  </div>
+
+  <h4>实体（{{ shard.entities|length }}）</h4>
+  {% if shard.entities %}
+  <table>
+    <thead><tr><th>实体</th><th>字节</th><th>记录数</th></tr></thead>
+    <tbody>
+      {% for e in shard.entities %}
+      <tr><td>{{ e.entity }}</td><td>{{ e.bytes|human_bytes }}</td><td>{{ e.records }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">（空分片：该 worker 无任务）</p>
+  {% endif %}
+
+  {% if shard.partitions %}
+  <h4>文件 / 分区（{{ shard.partitions|length }}）</h4>
+  <table>
+    <thead><tr><th>分区键</th><th>实体</th><th>字节</th><th>记录数</th></tr></thead>
+    <tbody>
+      {% for p in shard.partitions %}
+      <tr><td><code>{{ p.partition_key }}</code></td><td>{{ p.entity }}</td><td>{{ p.bytes|human_bytes }}</td><td>{{ p.records }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+{% endfor %}
+{% endblock %}
